@@ -15,6 +15,8 @@ jscode_upload_msg <- " Shiny.addCustomMessageHandler('upload_msg', function(msg)
   target.innerHTML = msg;
 }); "
 
+
+
 ui <- fluidPage(lang = "es",
   tags$script(HTML(jscode_upload_msg)),
   titlePanel(title = span(img(src = "logo_vitatracer.JPG", height = 50)),windowTitle = "VitaTracer"),
@@ -39,9 +41,19 @@ ui <- fluidPage(lang = "es",
       tabsetPanel(type = "tabs",
                   tabPanel("Overview",
                            br(),
-                           selectInput("sorting_variable",
-                                          label="Sort the plot below by:",
-                                          choices=c("Sample", "Category", "Analyte", "Unit")),
+                           # selectInput("sorting_variable",
+                           #                label="Sort the plot below by:",
+                           #                choices=c("Sample", "Category", "Analyte", "Unit")),
+                           rank_list(
+                             text = list(p("IMPORTANT!", style = "color:red", .noWS = "after"), "Drag and drop the items below (from first to last) and the plot will be sorted accordingly:"),
+                             labels = list(
+                               "Sample",
+                               "Category",
+                               "Analyte",
+                               "Unit"
+                             ),
+                             input_id = "sorting_variable"
+                           ),
                            plotOutput("plot_overview", height = 1000, width = 1200)
                   ),
                   tabPanel("Individual values",
@@ -94,7 +106,7 @@ server <- function(input, output,session) {
     # list_names_for_search <- list_names_for_search[grepl("\\D", list_names_for_search)]
     updateSelectizeInput(session, "individual_analyte",
                          label = NULL,
-                         selected="Blood - Hemogram white - Leucocytes (10^3/μl)",
+                         selected="Blood - Hemogram white - Leucocytes - 10^3/μl",
                          # selected="Urine - Urine - Nitrites (NA)",
                          choices = list_names_for_search,
                          server = TRUE)
@@ -119,11 +131,13 @@ server <- function(input, output,session) {
   
   output$plot_overview <- renderPlot({
     file=d()
-    sorting_variable = input$sorting_variable
+    sorting_variable = unlist(input$sorting_variable)
     table_for_heatmap <- file %>%
       dplyr::arrange(Date, Analyte) %>%
       tidyr::pivot_wider(id_cols = c(Full_Name, Analyte, Sample, Unit, Category), names_from = Date, values_from = Color) %>%
-      dplyr::arrange(get(sorting_variable), Sample, Analyte, Category, Unit) %>%
+      # dplyr::arrange(get(sorting_variable), Sample, Analyte, Category, Unit) %>%
+      # dplyr::arrange(Sample, Analyte, Category, Unit) %>%
+      dplyr::arrange(across(sorting_variable)) %>%
       tibble::column_to_rownames("Full_Name") %>%
       dplyr::select(-c(Analyte, Sample, Unit, Category)) %>% 
       as.matrix()
