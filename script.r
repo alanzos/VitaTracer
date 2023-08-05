@@ -7,6 +7,8 @@ library(plotly)
 library(ComplexHeatmap)
 library(InteractiveComplexHeatmap)
 library(viridis)
+library(sortable)
+library(formattable)
 
 options(encoding = 'UTF-8')
 
@@ -39,6 +41,9 @@ ui <- fluidPage(lang = "es",
     ),
     mainPanel(
       tabsetPanel(type = "tabs",
+                  tabPanel("Table",
+                           DT::dataTableOutput("table_overview")
+                  ),
                   tabPanel("Overview",
                            br(),
                            # selectInput("sorting_variable",
@@ -69,6 +74,10 @@ ui <- fluidPage(lang = "es",
 )
 
 server <- function(input, output,session) {
+  
+  color_scale <- c("#CD0000", "#3e9e1f", "#ff3300", "#ffffff")
+  names(color_scale) <- c("High", "Good", "Low", NA)
+  
   
   observeEvent(input$fileUpload, {
     session$sendCustomMessage("upload_msg", "Uploading data")
@@ -169,8 +178,7 @@ server <- function(input, output,session) {
     
     
     
-    color_scale <- c("#CD0000", "#3e9e1f", "#ff3300", "#ffffff")
-    names(color_scale) <- c("High", "Good", "Low", NA)
+
     
     # row_ha <- rowAnnotation(
     #   "Sample" = Sample,
@@ -259,6 +267,94 @@ server <- function(input, output,session) {
     ht <- draw(ht, merge_legends = TRUE)
     
   })
+  
+  output$table_overview <- DT::renderDataTable({
+    
+    # library(DT)
+    # 
+    # testrun <- round(runif(100), 6) # some data
+    # 
+    # data <- data.frame(testrun = testrun) # better to name it
+    # 
+    # brks <- quantile(data$testrun, probs = seq(.05, .95, .01), na.rm = TRUE) # provide numeric vector
+    # 
+    # clrs <- round(seq(305, 40, length.out = length(brks) + 1), 0) %>%
+    #   {paste0("rgb(305,", ., ",", ., ")")}
+    # 
+    # DT::datatable(data) %>%
+    #   formatStyle(colnames(data), backgroundColor = styleInterval(brks, clrs)) 
+    # 
+
+
+    brks <- c("High", "Good", "Low", NA)
+    clrs <- c("#CD0000", "#3e9e1f", "#ff3300", "#ffffff")
+    names(clrs) <- brks
+    
+    file=d()
+    table_for_heatmap <- file %>%
+      dplyr::arrange(Date, Sample, Category, Analyte, Unit) %>%
+      dplyr::mutate(Color = factor(Color),
+                    Analyte = factor(Analyte, levels = sort(unique(as.character(Analyte)))), 
+                    Unit = factor(Unit, levels = sort(unique(as.character(Unit)))),
+                    Sample = factor(Sample, levels = sort(unique(as.character(Sample)))), 
+                    Category = factor(Category, levels = sort(unique(as.character(Category))))) %>%
+      tidyr::pivot_wider(id_cols = c(Full_Name, Sample, Category, Analyte, Unit),
+                         names_from = Date, values_from = Color) %>%
+      dplyr::arrange(Sample, Category, Analyte, Unit) %>%
+      tibble::column_to_rownames("Full_Name")
+    table_for_heatmap
+    
+    DT::datatable(table_for_heatmap,
+                  filter = 'top', 
+                  extensions = c('Buttons', 'ColReorder', 'FixedHeader', 'Scroller', 'FixedColumns'),
+                  selection = 'none',
+                  options = list(
+                              #     dom = 'tpB',
+                              #     buttons = list(
+                              #       list(
+                              #         extend = "collection",
+                              #         text = 'Show all rows',
+                              #         action = DT::JS("function ( e, dt, node, config ) {
+                              # dt.page.len(-1);
+                              # dt.ajax.reload();}")
+                              #       ),list(
+                              #         extend = "collection",
+                              #         text = 'Show 5 rows',
+                              #         action = DT::JS("function ( e, dt, node, config ) {
+                              # dt.page.len(10);
+                              # dt.ajax.reload();}")
+                              #         
+                              #       )
+                              #     ),
+                    
+                                 lengthMenu = list(c(10, 50, -1), c('10', "50", 'All')),
+                                 pageLength  = -1,
+                                 scrollX = TRUE,
+                                 colReorder = TRUE, 
+                                 fixedHeader = TRUE,
+                                 scrollY = 600,
+                                 # scroller = TRUE,
+                                 # fixedColumns = list(leftColumns = 4),
+                                 # dom = 'Bfrtip',
+                                 # buttons = c('copy', 'csv', 'excel', 'pdf', 'print'),
+                                 autoWidth = TRUE),
+                  rownames = FALSE) %>%
+      formatStyle(colnames(table_for_heatmap)[!colnames(table_for_heatmap) %in% c("Analyte",
+                                                                                 "Sample",
+                                                                                 "Unit",
+                                                                                 "Category")],
+                  backgroundColor = styleEqual(brks, clrs))
+    
+    }#, 
+    # extensions = 'Buttons',
+    # options = list(scrollX = TRUE,
+    #                # dom = 'Bfrtip',
+    #                # buttons = c('copy', 'csv', 'excel', 'pdf', 'print'),
+    #                autoWidth = TRUE
+    #                ),
+    # filter = 'top',
+    # rownames = FALSE
+    )
   
   output$plot_individual <- renderPlot({
     individual_analyte = d3()
