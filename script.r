@@ -1,6 +1,9 @@
+library(BiocManager)
+options(repos = BiocManager::repositories())
 library(shiny)
 library(dplyr)
 library(ggplot2)
+library(BiocGenerics)
 library(stringi)
 library(DT)
 library(plotly)
@@ -9,6 +12,11 @@ library(InteractiveComplexHeatmap)
 library(viridis)
 library(sortable)
 library(formattable)
+library(tidyr)
+library(readxl)
+library(tibble)
+library(ComplexHeatmap)
+
 
 options(encoding = 'UTF-8')
 
@@ -26,7 +34,8 @@ ui <- fluidPage(lang = "es",
     position = "left",
     sidebarPanel(
       h5("Explore evolution of your lab results (like blood and urine) over time, and detect which values are outside of the reference."),
-      h5("Use the example data or load your own file following the format of ", a("this template", href="https://www.linkedin.com/in/andreslanzos", .noWS = "after"), "."),
+      br(),
+      h5("Use the example data or load your own file following the format of ", a("this template", href="https://www.dropbox.com/scl/fi/cn235zcg1jmqgm46eau5h/example_file_for_VitaTracer.xlsx?rlkey=wiu42n6jn9y4zsiscte1n4vvs&dl=0", target = "_blank", .noWS = "after"), "."),
       radioButtons("select_dataset",label="Select a choice:", choices=c("Example data","Upload data"),inline = F, selected="Example data"),
       conditionalPanel("input.select_dataset=='Upload data'",
                        fileInput(inputId = "fileUpload",
@@ -36,13 +45,17 @@ ui <- fluidPage(lang = "es",
                                   placeholder = "No data uploaded",
                                   accept = c(".xls")),                                     
                        uiOutput('ui.action') ),
-      h5("Contact: ", a("Andrés Lanzós.", href="https://www.linkedin.com/in/andreslanzos"))
+      br(),
+      h5(tags$b("Color legend:")),
+      h5("\"Good\" values (in green) are those that are within the reference values reported by the lab where the analysis was done. Since each lab uses different reference values, the same value might be \"Good\" for one date but not for another date (like it happens with GGT)."),
+      br(),
+      h5("Contact: ", a("Andrés Lanzós.", href="https://www.linkedin.com/in/andreslanzos", target = "_blank"))
       
     ),
     mainPanel(
       tabsetPanel(type = "tabs",
                   tabPanel("Table",
-                           DT::dataTableOutput("table_overview")
+                           div(DT::dataTableOutput("table_overview"), style = "font-size:100%")
                   ),
                   tabPanel("Overview",
                            br(),
@@ -75,6 +88,23 @@ ui <- fluidPage(lang = "es",
 
 server <- function(input, output,session) {
   
+  lighten_colors <- function(colors, factor = 0.5) {
+    lighten_color <- function(rgb_color) {
+      lightened_rgb <- (1 - factor) * rgb_color + factor * 255
+      return(round(lightened_rgb))
+    }
+    
+    lightened_colors <- sapply(colors, function(hex_color) {
+      rgb_color <- col2rgb(hex_color)
+      lightened_rgb <- lighten_color(rgb_color)
+      lightened_hex <- rgb(lightened_rgb[1], lightened_rgb[2], lightened_rgb[3], maxColorValue = 255)
+      return(lightened_hex)
+    })
+    
+    return(lightened_colors)
+  }
+  
+  
   color_scale <- c("#CD0000", "#3e9e1f", "#ff3300", "#ffffff")
   names(color_scale) <- c("High", "Good", "Low", NA)
   
@@ -104,6 +134,8 @@ server <- function(input, output,session) {
         Max = as.numeric(Max),
         Date = as.Date.character(Date),
         Date = as.character(Date),
+        Date = gsub("-", "/", Date),
+        # Date = substr(Date, 3, 10),
         Color = ifelse(Measure < Min, "Low",
                        ifelse(Measure > Max, "High",
                               "Good")),
@@ -286,23 +318,37 @@ server <- function(input, output,session) {
     # 
 
 
-    brks <- c("High", "Good", "Low", NA)
-    clrs <- c("#CD0000", "#3e9e1f", "#ff3300", "#ffffff")
-    names(clrs) <- brks
+    
     
     file=d()
-    table_for_heatmap <- file %>%
+    table_for_heatmap0 <- file %>%
       dplyr::arrange(Date, Sample, Category, Analyte, Unit) %>%
       dplyr::mutate(Color = factor(Color),
                     Analyte = factor(Analyte, levels = sort(unique(as.character(Analyte)))), 
                     Unit = factor(Unit, levels = sort(unique(as.character(Unit)))),
                     Sample = factor(Sample, levels = sort(unique(as.character(Sample)))), 
-                    Category = factor(Category, levels = sort(unique(as.character(Category))))) %>%
+                    Measure_Color = paste0(Measure, " (", Color, ")"),
+                    Category = factor(Category, levels = sort(unique(as.character(Category)))))
+    table_for_heatmap <- table_for_heatmap0 %>%
       tidyr::pivot_wider(id_cols = c(Full_Name, Sample, Category, Analyte, Unit),
-                         names_from = Date, values_from = Color) %>%
+                         names_from = Date, values_from = Measure_Color) %>%
       dplyr::arrange(Sample, Category, Analyte, Unit) %>%
       tibble::column_to_rownames("Full_Name")
-    table_for_heatmap
+    # table_for_heatmap
+    
+    # brks <- c("High", "Good", "Low", NA)
+    # clrs <- c("#CD0000", "#3e9e1f", "#ff3300", "#ffffff")
+    # names(clrs) <- brks
+    
+    brks <- c(sort(unique(as.character(table_for_heatmap0$Measure_Color))), NA)
+    clrs <- sort(unique(as.character(table_for_heatmap0$Measure_Color)))
+    clrs[grepl("High", clrs)] <- "#CD0000"
+    clrs[grepl("Good", clrs)] <- "#3e9e1f"
+    clrs[grepl("Low", clrs)] <- "#ff3300"
+    clrs <- c(clrs, "#ffffff")
+    names(clrs) <- brks
+    
+    clrs <- lighten_colors(clrs)
     
     DT::datatable(table_for_heatmap,
                   filter = 'top', 
