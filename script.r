@@ -129,9 +129,9 @@ server <- function(input, output,session) {
       dplyr::mutate(
         # Analyte = paste0(Sample, " - ", Category, " - ", Analyte, " (", Unit, ")"),
         Full_Name = paste0(Sample, " - ", Category, " - ", Analyte, " - ", Unit),
-        Min = as.numeric(Min),
-        Measure = as.numeric(Measure),
-        Max = as.numeric(Max),
+        Min = round(as.numeric(Min), digits=2),
+        Measure = round(as.numeric(Measure), digits=2),
+        Max = round(as.numeric(Max), digits=2),
         Date = as.Date.character(Date),
         Date = as.character(Date),
         Date = gsub("-", "/", Date),
