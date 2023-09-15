@@ -16,7 +16,7 @@ library(tidyr)
 library(readxl)
 library(tibble)
 library(ComplexHeatmap)
-
+library(emojifont)
 
 options(encoding = 'UTF-8')
 
@@ -47,7 +47,11 @@ ui <- fluidPage(lang = "es",
                        uiOutput('ui.action') ),
       br(),
       h5(tags$b("Color legend:")),
-      h5("\"Good\" values (in green) are those that are within the reference values reported by the lab where the analysis was done. Since each lab uses different reference values, the same value might be \"Good\" for one date but not for another date (like it happens with GGT)."),
+      h5("✅ values (in green) that are within the reference values reported by the lab where the analysis was done."),
+      h5("🔻 values (in orange) that are below the reference values reported by the lab where the analysis was done."),
+      h5("🔺 values (in red) that are above the reference values reported by the lab where the analysis was done."),
+      h5("Since each lab uses different reference values, the same value might be \"✅\" for one date but not for another 
+         date (like it happens with GGT)."),
       br(),
       h5("Contact: ", a("Andrés Lanzós.", href="https://www.linkedin.com/in/andreslanzos", target = "_blank"))
       
@@ -107,7 +111,12 @@ server <- function(input, output,session) {
   
   color_scale <- c("#CD0000", "#3e9e1f", "#ff3300", "#ffffff")
   names(color_scale) <- c("High", "Good", "Low", NA)
+
+  emoji_scale <- c("#CD0000", "#3e9e1f", "#ff3300", "#ffffff")
+  names(emoji_scale) <- c("🔺", "✅", "🔻", NA)
   
+  # color_scale <- c("#CD0000", "#3e9e1f", "#ff3300", "#ffffff")
+  # names(color_scale) <- c("🔺", "✅", "🔻", NA)
   
   observeEvent(input$fileUpload, {
     session$sendCustomMessage("upload_msg", "Uploading data")
@@ -139,7 +148,11 @@ server <- function(input, output,session) {
         Color = ifelse(Measure < Min, "Low",
                        ifelse(Measure > Max, "High",
                               "Good")),
-        Color = factor(Color, levels = c("High", "Good", "Low", NA))
+        Color = factor(Color, levels = c("High", "Good", "Low", NA)),
+        Emoji = ifelse(Measure < Min, "🔻",
+                       ifelse(Measure > Max, "🔺",
+                              "✅")),
+        Emoji = factor(Emoji, levels = c("🔺", "✅", "🔻", NA))
       )
     
     list_names_for_search <- unique(sort(unlist(file$Full_Name)))
@@ -234,28 +247,28 @@ server <- function(input, output,session) {
                            x = Sample, 
                            location = 0.05, 
                            just = "left",
-                           gp = gpar(fill = alpha(colour = Sample_colors[Sample],alpha =  0.5),
+                           gp = gpar(fill = alpha(colour = Sample_colors[Sample],alpha =  0.5), fontsize = 9,
                                      col = "black", border = NA),
                            width = max_text_width(Sample)*1.1),
       "Category" = anno_text(show_name = T,
                              x = Category, 
                              location = 0.05, 
                              just = "left",
-                             gp = gpar(fill = alpha(colour = Category_colors[Category],alpha =  0.5),
+                             gp = gpar(fill = alpha(colour = Category_colors[Category],alpha =  0.5), fontsize = 9,
                                        col = "black", border = NA),
                              width = max_text_width(Category)*1.1),
       "Analyte" = anno_text(show_name = T,
                              x = Analyte, 
                              location = 0.05, 
                              just = "left",
-                             gp = gpar(fill = "White",
+                             gp = gpar(fill = "White", fontsize = 9,
                                        col = "black", border = NA),
                              width = max_text_width(Analyte)*1.1),
       "Unit" = anno_text(show_name = T,
                              x = Unit, 
                              location = 0.05, 
                              just = "left",
-                             gp = gpar(fill = alpha(colour = Unit_colors[Unit],alpha =  0.5),
+                             gp = gpar(fill = alpha(colour = Unit_colors[Unit],alpha =  0.5), fontsize = 9,
                                        col = "black", border = NA),
                              width = max_text_width(Unit)*1.1),
       # col = list(
@@ -286,14 +299,16 @@ server <- function(input, output,session) {
                                   row_names_max_width = max_text_width(
                                     rownames(table_for_heatmap)
                                   ),
+                                  column_names_gp = grid::gpar(fontsize = 8),
+                                  row_names_gp = grid::gpar(fontsize = 8),
                                   column_title = "Date",
                                   column_title_side = "top",
                                   column_names_side = "top",
                                   left_annotation = row_ha,
                                   column_names_rot = 45, 
                                   # width = unit(15, "cm"),
-                                  heatmap_legend_param = list(title_gp = gpar (fontsize = 18, fontface = "bold"),
-                                                              labels_gp = gpar(fontsize = 14))
+                                  heatmap_legend_param = list(title_gp = gpar (fontsize = 12, fontface = "bold"),
+                                                              labels_gp = gpar(fontsize = 10))
     )
     
     ht <- draw(ht, merge_legends = TRUE)
@@ -324,27 +339,25 @@ server <- function(input, output,session) {
     table_for_heatmap0 <- file %>%
       dplyr::arrange(Date, Sample, Category, Analyte, Unit) %>%
       dplyr::mutate(Color = factor(Color),
+                    Emoji = factor(Emoji),
                     Analyte = factor(Analyte, levels = sort(unique(as.character(Analyte)))), 
                     Unit = factor(Unit, levels = sort(unique(as.character(Unit)))),
                     Sample = factor(Sample, levels = sort(unique(as.character(Sample)))), 
-                    Measure_Color = paste0(Measure, " (", Color, ")"),
+                    Measure_Emoji = paste0(Emoji, " ", Measure , ""),
                     Category = factor(Category, levels = sort(unique(as.character(Category)))))
     table_for_heatmap <- table_for_heatmap0 %>%
       tidyr::pivot_wider(id_cols = c(Full_Name, Sample, Category, Analyte, Unit),
-                         names_from = Date, values_from = Measure_Color) %>%
+                         names_from = Date, values_from = Measure_Emoji) %>%
       dplyr::arrange(Sample, Category, Analyte, Unit) %>%
       tibble::column_to_rownames("Full_Name")
     # table_for_heatmap
     
-    # brks <- c("High", "Good", "Low", NA)
-    # clrs <- c("#CD0000", "#3e9e1f", "#ff3300", "#ffffff")
-    # names(clrs) <- brks
     
-    brks <- c(sort(unique(as.character(table_for_heatmap0$Measure_Color))), NA)
-    clrs <- sort(unique(as.character(table_for_heatmap0$Measure_Color)))
-    clrs[grepl("High", clrs)] <- "#CD0000"
-    clrs[grepl("Good", clrs)] <- "#3e9e1f"
-    clrs[grepl("Low", clrs)] <- "#ff3300"
+    brks <- c(sort(unique(as.character(table_for_heatmap0$Measure_Emoji))), NA)
+    clrs <- sort(unique(as.character(table_for_heatmap0$Measure_Emoji)))
+    clrs[grepl("🔺", clrs)] <- "#CD0000"
+    clrs[grepl("✅", clrs)] <- "#3e9e1f"
+    clrs[grepl("🔻", clrs)] <- "#ff3300"
     clrs <- c(clrs, "#ffffff")
     names(clrs) <- brks
     
