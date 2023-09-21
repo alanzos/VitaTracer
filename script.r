@@ -33,7 +33,7 @@ ui <- fluidPage(lang = "es",
   sidebarLayout(
     position = "left",
     sidebarPanel(
-      h5("Explore evolution of your lab results (like blood and urine) over time, and detect which values are outside of the reference."),
+      h5("Explore the evolution of your lab results (like blood and urine) over time, and detect which values are outside of the reference."),
       br(),
       h5("Use the example data or load your own file following the format of ", a("this template", href="https://www.dropbox.com/scl/fi/cn235zcg1jmqgm46eau5h/example_file_for_VitaTracer.xlsx?rlkey=wiu42n6jn9y4zsiscte1n4vvs&dl=0", target = "_blank", .noWS = "after"), "."),
       radioButtons("select_dataset",label="Select a choice:", choices=c("Example data","Upload data"),inline = F, selected="Example data"),
@@ -59,7 +59,8 @@ ui <- fluidPage(lang = "es",
     mainPanel(
       tabsetPanel(type = "tabs",
                   tabPanel("Table",
-                           div(DT::dataTableOutput("table_overview"), style = "font-size:100%")
+                           DT::dataTableOutput("table_overview")
+                           # div(DT::dataTableOutput("table_overview"), style = "font-size:100%")
                   ),
                   tabPanel("Overview",
                            br(),
@@ -90,7 +91,7 @@ ui <- fluidPage(lang = "es",
   )
 )
 
-server <- function(input, output,session) {
+server <- function(input, output, session) {
   
   lighten_colors <- function(colors, factor = 0.5) {
     lighten_color <- function(rgb_color) {
@@ -364,9 +365,9 @@ server <- function(input, output,session) {
     clrs <- lighten_colors(clrs)
     
     DT::datatable(table_for_heatmap,
-                  filter = 'top', 
+                  # filter = 'none',
                   extensions = c('Buttons', 'ColReorder', 'FixedHeader', 'Scroller', 'FixedColumns'),
-                  selection = 'none',
+                  # selection = 'none',
                   options = list(
                               #     dom = 'tpB',
                               #     buttons = list(
@@ -393,7 +394,7 @@ server <- function(input, output,session) {
                                  fixedHeader = TRUE,
                                  scrollY = 600,
                                  # scroller = TRUE,
-                                 # fixedColumns = list(leftColumns = 4),
+                                 fixedColumns = list(leftColumns = 4),
                                  # dom = 'Bfrtip',
                                  # buttons = c('copy', 'csv', 'excel', 'pdf', 'print'),
                                  autoWidth = TRUE),
@@ -445,7 +446,8 @@ server <- function(input, output,session) {
         scale_color_manual(values = color_scale, name = "Value") +
         theme_classic() +
         theme(
-          axis.text = element_text(size = 14, color = "black", face = "plain"),
+          axis.text.y = element_text(size = 14, color = "black", face = "plain"),
+          axis.text.x = element_text(size = 14, color = "black", face = "plain", angle = 45, vjust = 1, hjust = 1),
           axis.title = element_text(size = 14, color = "black", face = "plain"),
           axis.line = element_line(colour = "black", size = 0.5, linetype = "solid"),
           panel.grid = element_blank(),
