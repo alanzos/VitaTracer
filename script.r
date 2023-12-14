@@ -46,6 +46,14 @@ ui <- fluidPage(lang = "es",
                                   accept = c(".xls")),                                     
                        uiOutput('ui.action') ),
       br(),
+      h5("Select the minimum number of times that an analyte must have been measured to be visible on the graphics."),
+      numericInput("min_measurement", label = "Min. measurements", value = 1),
+      br(),
+      h5(tags$b("Sample legend:")),
+      h5("🩸 = Blood sample."),
+      h5("🚽 = Urine sample."),
+      h5("💩 = Stool sample."),
+      br(),
       h5(tags$b("Color legend:")),
       h5("✅ values (in green) that are within the reference values reported by the lab where the analysis was done."),
       h5("🔻 values (in orange) that are below the reference values reported by the lab where the analysis was done."),
@@ -134,9 +142,14 @@ server <- function(input, output, session) {
       file=input$fileUpload
       file=readxl::read_xlsx(as.character(file$datapath),1)
     }
+    
     file <- file %>% 
       dplyr::arrange(Sample, Analyte, Unit)  %>% 
       dplyr::mutate(
+        Sample_Emoji = ifelse(Sample=="Blood", "🩸",
+                        ifelse(Sample=="Urine", "🚽",
+                               "💩")),
+        Sample_Emoji = factor(Sample_Emoji, levels = c("🩸", "🚽", "💩", NA)),
         # Analyte = paste0(Sample, " - ", Category, " - ", Analyte, " (", Unit, ")"),
         Full_Name = paste0(Sample, " - ", Category, " - ", Analyte, " - ", Unit),
         Min = round(as.numeric(Min), digits=2),
@@ -153,7 +166,11 @@ server <- function(input, output, session) {
         Emoji = ifelse(Measure < Min, "🔻",
                        ifelse(Measure > Max, "🔺",
                               "✅")),
-        Emoji = factor(Emoji, levels = c("🔺", "✅", "🔻", NA))
+        Emoji = factor(Emoji, levels = c("🔺", "✅", "🔻", NA)),
+      ) %>% 
+      dplyr::group_by(Full_Name) %>% 
+      dplyr::filter(
+        n()>=input$min_measurement
       )
     
     list_names_for_search <- unique(sort(unlist(file$Full_Name)))
@@ -318,41 +335,26 @@ server <- function(input, output, session) {
   
   output$table_overview <- DT::renderDataTable({
     
-    # library(DT)
-    # 
-    # testrun <- round(runif(100), 6) # some data
-    # 
-    # data <- data.frame(testrun = testrun) # better to name it
-    # 
-    # brks <- quantile(data$testrun, probs = seq(.05, .95, .01), na.rm = TRUE) # provide numeric vector
-    # 
-    # clrs <- round(seq(305, 40, length.out = length(brks) + 1), 0) %>%
-    #   {paste0("rgb(305,", ., ",", ., ")")}
-    # 
-    # DT::datatable(data) %>%
-    #   formatStyle(colnames(data), backgroundColor = styleInterval(brks, clrs)) 
-    # 
-
-
-    
-    
     file=d()
     table_for_heatmap0 <- file %>%
-      dplyr::arrange(Date, Sample, Category, Analyte, Unit) %>%
+      dplyr::arrange(Date, Analyte, Sample, Category, Unit) %>%
       dplyr::mutate(Color = factor(Color),
                     Emoji = factor(Emoji),
                     Analyte = factor(Analyte, levels = sort(unique(as.character(Analyte)))), 
                     Unit = factor(Unit, levels = sort(unique(as.character(Unit)))),
-                    Sample = factor(Sample, levels = sort(unique(as.character(Sample)))), 
+                    Sample = factor(Sample, levels = sort(unique(as.character(Sample)))),
+                    Sample = Sample_Emoji,
                     Measure_Emoji = paste0(Emoji, " ", Measure , ""),
                     Category = factor(Category, levels = sort(unique(as.character(Category)))))
     table_for_heatmap <- table_for_heatmap0 %>%
       tidyr::pivot_wider(id_cols = c(Full_Name, Sample, Category, Analyte, Unit),
                          names_from = Date, values_from = Measure_Emoji) %>%
-      dplyr::arrange(Sample, Category, Analyte, Unit) %>%
+      dplyr::as_data_frame() %>% 
+      dplyr::mutate(Analyte = factor(Analyte, levels = sort(unique(as.character(Analyte)))),
+                    # Sample = factor(Sample, levels = sort(unique(as.character(Sample)))), 
+                    Unit = factor(Unit, levels = sort(unique(as.character(Unit))))) %>% 
+      dplyr::arrange(Analyte, Sample, Unit, Category) %>%
       tibble::column_to_rownames("Full_Name")
-    # table_for_heatmap
-    
     
     brks <- c(sort(unique(as.character(table_for_heatmap0$Measure_Emoji))), NA)
     clrs <- sort(unique(as.character(table_for_heatmap0$Measure_Emoji)))
@@ -390,7 +392,7 @@ server <- function(input, output, session) {
                                  lengthMenu = list(c(10, 50, -1), c('10', "50", 'All')),
                                  pageLength  = -1,
                                  scrollX = TRUE,
-                                 colReorder = TRUE, 
+                                 # colReorder = TRUE, 
                                  fixedHeader = TRUE,
                                  scrollY = 600,
                                  # scroller = TRUE,
@@ -399,10 +401,10 @@ server <- function(input, output, session) {
                                  # buttons = c('copy', 'csv', 'excel', 'pdf', 'print'),
                                  autoWidth = TRUE),
                   rownames = FALSE) %>%
-      formatStyle(colnames(table_for_heatmap)[!colnames(table_for_heatmap) %in% c("Analyte",
-                                                                                 "Sample",
-                                                                                 "Unit",
-                                                                                 "Category")],
+      formatStyle(colnames(table_for_heatmap)[!colnames(table_for_heatmap) %in% c("Sample",
+                                                                                  "Analyte",
+                                                                                  "Unit",
+                                                                                  "Category")],
                   backgroundColor = styleEqual(brks, clrs))
     
     }#, 
