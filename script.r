@@ -66,6 +66,9 @@ ui <- fluidPage(lang = "es",
     ),
     mainPanel(
       tabsetPanel(type = "tabs",
+                  tabPanel("Summary",
+                           plotlyOutput("plot_summary", height = 600)
+                  ),
                   tabPanel("Table",
                            DT::dataTableOutput("table_overview")
                            # div(DT::dataTableOutput("table_overview"), style = "font-size:100%")
@@ -490,6 +493,100 @@ server <- function(input, output, session) {
         )
     }
   })
+  
+  output$plot_summary <- renderPlotly({
+    
+    file=d()
+    selected_dates <- sort(unique(file$Date))
+    selected_dates <- tail(selected_dates,3)
+    
+    table_for_heatmap0 <- file%>%
+      as.data.frame() %>% 
+      dplyr::arrange(Date, Analyte, Sample, Category, Unit) %>%
+      # dplyr::filter(Date %in% selected_dates) %>% 
+      dplyr::mutate(`Value in range` = Color,
+                    Emoji = factor(Emoji),
+                    Analyte = factor(Analyte, levels = sort(unique(as.character(Analyte)))), 
+                    Unit = factor(Unit, levels = sort(unique(as.character(Unit)))),
+                    Sample = factor(Sample, levels = sort(unique(as.character(Sample)))),
+                    Measure_Emoji = paste0(Emoji, " ", Measure , ""),
+                    Category = factor(Category, levels = sort(unique(as.character(Category))))) %>% 
+      dplyr::group_by(Date, `Value in range`) %>% 
+      dplyr::summarise(`Number of analytes` = n()) %>% 
+      dplyr::ungroup() %>% 
+      as.data.frame()
+    
+    p <- ggplot(table_for_heatmap0, aes(y = Date, x = `Number of analytes`,
+                                        fill = `Value in range`,
+                                        text = paste('Date: ', Date,
+                                                     '</br></br> Value in range: ', `Value in range`,
+                                                     '</br> Number of analytes: ', `Number of analytes`
+                                                     ))) +
+      scale_fill_manual(values = color_scale) +
+      geom_bar(stat = "identity", position = "stack") +
+      ylab("")+
+      theme_classic() +
+      theme(
+        axis.text = element_text(size = 14, color = "black", face = "plain"),
+        axis.title = element_text(size = 14, color = "black", face = "plain"),
+        axis.line = element_line(colour = "black", size = 0.5, linetype = "solid"),
+        panel.grid = element_blank(),
+        legend.position = "top",
+        legend.text = element_text(size = 14, color = "black", face = "plain"),
+        legend.title = element_text(size = 14, color = "black", face = "plain")
+      )
+    ggplotly(p, tooltip = c("text")) %>%
+      plotly::layout(legend=list(x=0, y = 1, 
+                                 xanchor='left',
+                                 yanchor='bottom',
+                                 orientation='h')) 
+    
+    # p <- ggplot(table_for_heatmap0, aes(x="", y=Number, fill=Color )) +
+    #   geom_bar(stat="identity", width=1) +
+    #   coord_polar("y", start=0) + 
+    #   theme_void() +
+    #   theme(legend.position="bottom") +
+    #   scale_fill_manual(values = color_scale, name = "Value") + 
+    #   # theme(plot.margin = unit(c(1,1,1,1), "cm")) +
+    #   facet_wrap("Date")
+    
+    # fig <- table_for_heatmap0 %>% plot_ly(labels = ~Color, values = ~Number, 
+    #                                       textinfo='label+percent+value',
+    #                                       marker = list(colors = ~color_scale[Color]))
+    # fig <- fig %>% add_pie(hole = 0.6)
+    # fig <- fig %>% layout(showlegend = F,
+    #                       xaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE),
+    #                       yaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE))
+    # fig
+    
+    # fig <- plot_ly()
+    # fig <- fig %>%
+    #   add_pie(data = table_for_heatmap0 %>% dplyr::filter(Date==selected_dates[1]),
+    #                        labels = ~Color,
+    #                        values = ~Number,
+    #                        textinfo='label+percent+value',
+    #                        marker = list(colors = ~color_scale[Color]),
+    #                        title = selected_dates[1],
+    #                        name = selected_dates[1],
+    #                        domain = list(row = 0, column = 0)) %>%
+    #   add_pie(data = table_for_heatmap0 %>% dplyr::filter(Date==selected_dates[2]),
+    #           labels = ~Color,
+    #           values = ~Number,
+    #           textinfo='label+percent+value',
+    #           marker = list(colors = ~color_scale[Color]),
+    #           title = selected_dates[2],
+    #           name = selected_dates[2],
+    #           domain = list(row = 0, column = 1))
+    # fig <- fig %>% layout(title = "Pie Charts with Subplots", showlegend = F,
+    #                       grid=list(rows=1, columns=2 ),
+    #                       xaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE),
+    #                       yaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE))
+    
+    
+      
+  })
+  
+  
 }
 
 shinyApp(ui = ui, server = server)
