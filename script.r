@@ -42,7 +42,7 @@ ui <- fluidPage(lang = "es",
                                   multiple = FALSE,
                                   buttonLabel = "Upload",
                                   placeholder = "No data uploaded",
-                                  accept = c(".xls")),                                     
+                                  accept = c(".xls")),
                        uiOutput('ui.action') ),
       br(),
       h5("Select the minimum number of times that an analyte must have been measured to be visible on the graphics."),
@@ -57,11 +57,11 @@ ui <- fluidPage(lang = "es",
       h5("✅ values (in green) that are within the reference values reported by the lab where the analysis was done."),
       h5("🔻 values (in orange) that are below the reference values reported by the lab where the analysis was done."),
       h5("🔺 values (in red) that are above the reference values reported by the lab where the analysis was done."),
-      h5("Since each lab uses different reference values, the same value might be \"✅\" for one date but not for another 
+      h5("Since each lab uses different reference values, the same value might be \"✅\" for one date but not for another
          date (like it happens with GGT)."),
       br(),
       h5("Contact: ", a("Andrés Lanzós.", href="https://www.linkedin.com/in/andreslanzos", target = "_blank"))
-      
+
     ),
     mainPanel(
       tabsetPanel(type = "tabs",
@@ -78,7 +78,8 @@ ui <- fluidPage(lang = "es",
                            #                label="Sort the plot below by:",
                            #                choices=c("Sample", "Category", "Analyte", "Unit")),
                            rank_list(
-                             text = list(p("IMPORTANT!", style = "color:red", .noWS = "after"), "Drag and drop the items below (from first to last) and the plot will be sorted accordingly:"),
+                             # text = list(p("IMPORTANT!", style = "color:red", .noWS = "after"), "Drag and drop the items below (from first to last) and the plot will be sorted accordingly:"),
+                             text = "IMPORTANT! Drag and drop the items below (from first to last) and the plot will be sorted accordingly:",
                              labels = list(
                                "Sample",
                                "Category",
@@ -128,6 +129,7 @@ server <- function(input, output, session) {
   
   # color_scale <- c("#CD0000", "#3e9e1f", "#ff3300", "#ffffff")
   # names(color_scale) <- c("🔺", "✅", "🔻", NA)
+  
   
   observeEvent(input$fileUpload, {
     session$sendCustomMessage("upload_msg", "Uploading data")
