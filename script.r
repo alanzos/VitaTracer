@@ -15,7 +15,6 @@ library(formattable)
 library(tidyr)
 library(readxl)
 library(tibble)
-library(ComplexHeatmap)
 library(emojifont)
 
 options(encoding = 'UTF-8')
