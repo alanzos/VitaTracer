@@ -16,6 +16,7 @@ library(tidyr)
 library(readxl)
 library(tibble)
 library(emojifont)
+library(ggrepel)
 
 options(encoding = 'UTF-8')
 
@@ -442,6 +443,7 @@ server <- function(input, output, session) {
              mapping = aes(
                x = Date,
                y = Measure,
+               label = Measure
              )) +
         ylab(individual_analyte) +
         geom_ribbon(data = file, mapping = aes(x=Date, y=Measure,
@@ -449,6 +451,8 @@ server <- function(input, output, session) {
                                                group = 1), fill = "#3e9e1f", alpha = 0.1) +
         geom_line(mapping = aes(group = 1, color = Color2), size = 2) +
         geom_point(mapping = aes(color = Color), size = 5) +
+        geom_label_repel(mapping = aes(color = Color), size = 5, box.padding = 0.3,
+                         label.padding = 0.1, label.size = NA, show_guide = FALSE) +
         scale_color_manual(values = color_scale, name = "Value") +
         theme_classic() +
         theme(
@@ -481,6 +485,14 @@ server <- function(input, output, session) {
                      y = Measure,
                      color = Color
                    ), size = 5) +
+        geom_label_repel(data = file,
+                         mapping = aes(
+                           x = Date,
+                           y = Measure,
+                           label = Measure,
+                           color = Color
+                         ), size = 5, box.padding = 0.3,
+                         label.padding = 0.1, label.size = NA, show_guide = FALSE) +
         scale_color_manual(values = color_scale, name = "Value") +
         theme_classic() +
         theme(
