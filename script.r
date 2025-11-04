@@ -140,11 +140,13 @@ server <- function(input, output, session) {
     
    if (input$select_dataset=="Example data") {
       file=readxl::read_xlsx("data/summary.xlsx",1)
+      file_events=readxl::read_xlsx("data/summary.xlsx",2)
     } else {
       validate(
         need(!is.null(input$fileUpload), "Error: please upload your data or choose the example one.")
       )
       file=input$fileUpload
+      file_events=readxl::read_xlsx(as.character(file$datapath),2)
       file=readxl::read_xlsx(as.character(file$datapath),1)
     }
     
@@ -187,12 +189,22 @@ server <- function(input, output, session) {
                          # selected="Urine - Urine - Nitrites (NA)",
                          choices = list_names_for_search,
                          server = TRUE)
-    print("done")
-    
-    # file$Emprendedora=stri_trans_totitle(file$Emprendedora)
     file
   })
   
+  d_events <- reactive({
+    
+    if (input$select_dataset=="Example data") {
+      file_events=readxl::read_xlsx("data/summary.xlsx",2)
+    } else {
+      validate(
+        need(!is.null(input$fileUpload), "Error: please upload your data or choose the example one.")
+      )
+      file=input$fileUpload
+      file_events=readxl::read_xlsx(as.character(file$datapath),2)
+    }
+    file_events
+  })
   
   
   # d2 <- reactive({
@@ -425,6 +437,7 @@ server <- function(input, output, session) {
   
   output$plot_individual <- renderPlot({
     individual_analyte = d3()
+    file_events <- d_events()
     # file <- d() %>% 
     #   dplyr::filter(Analyte == individual_analyte) %>% 
     #   dplyr::arrange(Date) %>% 
@@ -445,6 +458,7 @@ server <- function(input, output, session) {
                y = Measure,
                label = Measure
              )) +
+        geom_vline(xintercept = file_events$Date,colour = "red", linewidth = 2) +
         ylab(individual_analyte) +
         geom_ribbon(data = file, mapping = aes(x=Date, y=Measure,
                                                ymax=Max+0.001, ymin=Min-0.001,
